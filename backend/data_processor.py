@@ -130,6 +130,30 @@ class DataProcessor:
         self.df = df
         return self.df
 
+    def build_supervised_dataset(self, horizon_days: int = 14):
+        """
+        Build a supervised learning dataset for multi-horizon regression.
+        Returns feature matrix X, target matrix y, and feature column names.
+        """
+        if self.df is None or self.df.empty:
+            raise ValueError("Dataframe is empty. Fetch and process data first.")
+
+        df = self.df.copy()
+        target_cols = []
+        for h in range(1, horizon_days + 1):
+            target_col = f"target_h{h}"
+            df[target_col] = df["Close"].shift(-h)
+            target_cols.append(target_col)
+
+        df = df.dropna(subset=target_cols)
+        if df.empty:
+            raise ValueError("Not enough data to build supervised dataset.")
+
+        feature_cols = [c for c in df.columns if c not in target_cols]
+        X = df[feature_cols]
+        y = df[target_cols]
+        return X, y, feature_cols
+
     def get_processed_data(self):
         """
         Return the processed dataframe with NaNs dropped (from indicators).

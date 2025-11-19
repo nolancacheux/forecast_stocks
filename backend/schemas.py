@@ -13,6 +13,11 @@ class Metrics(BaseModel):
     rmse: float
     mape: float
 
+class ConfidenceInterval(BaseModel):
+    lower: List[float]
+    upper: List[float]
+
+
 class PredictionResponse(BaseModel):
     ticker: str
     model: str
@@ -22,7 +27,7 @@ class PredictionResponse(BaseModel):
     predicted_price: Optional[float] = None
     forecast_dates: Optional[List[str]] = None
     forecast_values: Optional[List[float]] = None
-    confidence_interval: Optional[List[float]] = None
+    confidence_interval: Optional[ConfidenceInterval] = None
     metrics: Optional[Metrics] = None
 
 class BacktestRequest(BaseModel):

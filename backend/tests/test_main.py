@@ -31,14 +31,26 @@ def test_predict_endpoint(MockModelEngine, MockDataProcessor):
     
     mock_processor.fetch_data.return_value = df
     mock_processor.add_indicators.return_value = df
-    mock_processor.prepare_target.return_value = df
+    supervised = df.copy()
+    supervised["target_h1"] = supervised["Close"].shift(-1)
+    supervised = supervised.dropna()
+    X = supervised[["Open", "High", "Low", "Close"]]
+    y = supervised[["target_h1"]]
+    mock_processor.build_supervised_dataset.return_value = (X, y, X.columns.tolist())
     
     # Mock ModelEngine
     mock_engine = MockModelEngine.return_value
     mock_engine.predict.return_value = {
         "direction": "UP",
         "probability": 0.8,
-        "feature_importance": {"RSI": 0.5}
+        "feature_importance": {"RSI": 0.5},
+        "predicted_price": 1.0,
+        "forecast_dates": ["2024-01-01"],
+        "forecast_values": [1.0],
+        "confidence_interval": {
+            "lower": [0.9],
+            "upper": [1.1]
+        }
     }
     
     payload = {

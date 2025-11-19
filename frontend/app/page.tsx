@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from "react"
 import { useTheme } from "next-themes"
 import { 
-    Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter 
+    Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card"
 import { 
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue 
@@ -12,8 +12,6 @@ import { Slider } from "@/components/ui/slider"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Switch } from "@/components/ui/switch"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -22,13 +20,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 import { 
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-    ReferenceLine, Area, ComposedChart, Legend 
+    Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
+    ReferenceLine, ComposedChart, Legend 
 } from 'recharts'
 import { 
-    Activity, Zap, BarChart3, TrendingUp, Calendar as CalendarIcon, 
-    Layers, History, Settings, Bell, Search, LayoutDashboard, 
-    ArrowUpRight, ArrowDownRight, ChevronRight, Info, Moon, Sun
+    Activity, Zap, BarChart3, Calendar as CalendarIcon, 
+    Settings, Bell, Search, LayoutDashboard, 
+    ArrowUpRight, ArrowDownRight, Moon, Sun
 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
@@ -43,7 +41,10 @@ type Prediction = {
   forecast_dates?: string[]
   forecast_values?: number[]
   predicted_price?: number
-  confidence_interval?: [number, number][] // Array of [lower, upper] if coming from Prophet
+  confidence_interval?: {
+      lower: number[]
+      upper: number[]
+  }
   metrics?: {
       mae: number
       rmse: number
@@ -156,10 +157,11 @@ export default function Dashboard() {
   const maxDate = useMemo(() => history.length ? new Date(history[history.length - 1].Date) : undefined, [history])
 
   useEffect(() => {
-    if (startDate && minDate && startDate < minDate) {
+    if (!minDate) return
+    if (!startDate || startDate < minDate) {
         setStartDate(minDate)
     }
-    if (referenceDate && minDate && referenceDate < minDate) {
+    if (referenceDate && referenceDate < minDate) {
         setReferenceDate(minDate)
     }
   }, [minDate])
@@ -181,15 +183,16 @@ export default function Dashboard() {
           isForecast: false
       }));
 
+      const ciLowerSeries = prediction?.confidence_interval?.lower
+      const ciUpperSeries = prediction?.confidence_interval?.upper
+
       if (prediction?.forecast_dates && prediction?.forecast_values) {
           prediction.forecast_dates.forEach((d, i) => {
               const existingIndex = data.findIndex(item => item.Date === d);
               
               const forecastVal = prediction.forecast_values![i];
-              // Hacky CI generation if missing: +/- 2% for demo if user toggles it and model doesn't provide
-              // (Since backend might only provide scalar or incomplete CI currently)
-                const ci_lower = forecastVal * 0.98; 
-                const ci_upper = forecastVal * 1.02;
+              const ci_lower = ciLowerSeries?.[i] ?? forecastVal * 0.98; 
+              const ci_upper = ciUpperSeries?.[i] ?? forecastVal * 1.02;
 
               if (existingIndex !== -1) {
                   data[existingIndex].Forecast = forecastVal;
@@ -212,8 +215,13 @@ export default function Dashboard() {
   }, [history, prediction]);
 
   const todayLabel = maxDate ? format(maxDate, "MMM d, yyyy") : null
-  const canShowForecast = Boolean(prediction?.forecast_values && prediction.forecast_values.length > 0)
-  const displayForecastTarget = prediction?.predicted_price ?? prediction?.forecast_values?.[prediction.forecast_values.length - 1] ?? null
+  const hasForecastPath = Boolean(prediction?.forecast_values && prediction.forecast_values.length > 0)
+  const hasConfidence = Boolean(
+    prediction?.confidence_interval?.lower?.length &&
+    prediction?.confidence_interval?.upper?.length
+  )
+  const canShowConfidence = hasForecastPath && hasConfidence
+  const displayForecastTarget = prediction?.predicted_price ?? (prediction?.forecast_values ? prediction.forecast_values[prediction.forecast_values.length - 1] : null)
 
   // --- Layout ---
   return (
@@ -305,7 +313,7 @@ export default function Dashboard() {
                             <Button 
                                 variant="outline" 
                                 onClick={() => setShowCI(!showCI)} 
-                                disabled={!canShowForecast}
+                                disabled={!canShowConfidence}
                                 className={cn(showCI && "bg-zinc-100 dark:bg-zinc-800")}
                             >
                                 {showCI ? "Hide" : "Show"} Confidence
@@ -328,7 +336,7 @@ export default function Dashboard() {
                                         </CardHeader>
                                         <CardContent className="space-y-4">
                                             <div className="space-y-2">
-                                                <label className="text-xs font-medium text-zinc-500 uppercase">Asset</label>
+                                                <p className="text-xs font-medium text-zinc-500 uppercase">Asset</p>
                                                 <Select value={ticker} onValueChange={setTicker}>
                                                     <SelectTrigger className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                         <SelectValue />
@@ -347,7 +355,7 @@ export default function Dashboard() {
                                             </div>
                                             
                                             <div className="space-y-2">
-                                                <label className="text-xs font-medium text-zinc-500 uppercase">Engine</label>
+                                                <p className="text-xs font-medium text-zinc-500 uppercase">Engine</p>
                                                 <Select value={model} onValueChange={setModel}>
                                                     <SelectTrigger className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                         <SelectValue />
@@ -355,14 +363,14 @@ export default function Dashboard() {
                                                     <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
                                                         <SelectItem value="xgboost">XGBoost</SelectItem>
                                                         <SelectItem value="random_forest">Random Forest</SelectItem>
-                                                        <SelectItem value="logistic_regression">Logistic Regression</SelectItem>
+                                                        <SelectItem value="linear_regression">Linear Regression</SelectItem>
                                                         <SelectItem value="prophet">Prophet</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-xs font-medium text-zinc-500 uppercase">Start Training From</label>
+                                                <p className="text-xs font-medium text-zinc-500 uppercase">Start Training From</p>
                                                 <Popover>
                                                     <PopoverTrigger asChild>
                                                         <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
@@ -377,7 +385,6 @@ export default function Dashboard() {
                                                             onSelect={setStartDate} 
                                                             fromDate={minDate}
                                                             toDate={referenceDate ?? maxDate}
-                                                            initialFocus 
                                                             className="bg-white dark:bg-zinc-900" 
                                                         />
                                                     </PopoverContent>
@@ -388,7 +395,7 @@ export default function Dashboard() {
                                             </div>
 
                                             <div className="space-y-2">
-                                                <label className="text-xs font-medium text-zinc-500 uppercase">Prediction Point (Backtest)</label>
+                                                <p className="text-xs font-medium text-zinc-500 uppercase">Prediction Point (Backtest)</p>
                                                 <Popover>
                                                     <PopoverTrigger asChild>
                                                         <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
@@ -403,7 +410,6 @@ export default function Dashboard() {
                                                             onSelect={setReferenceDate} 
                                                             fromDate={startDate ?? minDate}
                                                             toDate={maxDate}
-                                                            initialFocus 
                                                             className="bg-white dark:bg-zinc-900" 
                                                         />
                                                     </PopoverContent>
@@ -507,14 +513,25 @@ export default function Dashboard() {
                                                         connectNulls
                                                     />
                                                     
-                                                    {showCI && (
+                                                    {showCI && canShowConfidence && (
                                                         <>
-                                                            <Area 
+                                                            <Line 
                                                                 type="monotone" 
                                                                 dataKey="ci_upper" 
-                                                                stroke="none" 
-                                                                fill="#f59e0b" 
-                                                                fillOpacity={0.1} 
+                                                                stroke="#fbbf24" 
+                                                                strokeWidth={1} 
+                                                                dot={false}
+                                                                strokeDasharray="4 4"
+                                                                legendType="none"
+                                                            />
+                                                            <Line 
+                                                                type="monotone" 
+                                                                dataKey="ci_lower" 
+                                                                stroke="#fbbf24" 
+                                                                strokeWidth={1} 
+                                                                dot={false}
+                                                                strokeDasharray="4 4"
+                                                                legendType="none"
                                                             />
                                                         </>
                                                     )}
@@ -636,7 +653,7 @@ export default function Dashboard() {
                             <CardContent className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <label className="text-base font-medium">Theme Mode</label>
+                                        <p className="text-base font-medium">Theme Mode</p>
                                         <p className="text-sm text-zinc-500">Switch between light and dark mode</p>
                                     </div>
                                     <Button variant="outline" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>

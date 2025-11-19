@@ -76,14 +76,15 @@ def predict(request: PredictionRequest):
             engine.train(train_data, model_type=request.model)
         else:
             if train_cutoff:
-                df_at_cutoff = df_with_indicators[df_with_indicators.index <= train_cutoff]
-                processor.df = df_at_cutoff
-                train_df = processor.prepare_target(request.horizon)
+                train_df = df_with_indicators[df_with_indicators.index <= train_cutoff]
             else:
-                processor.df = df_with_indicators
-                train_df = processor.prepare_target(request.horizon)
-
-            engine.train(train_df, model_type=request.model)
+                train_df = df_with_indicators
+            processor.df = train_df
+            X, y, feature_cols = processor.build_supervised_dataset(request.horizon)
+            if X.empty:
+                raise HTTPException(status_code=400, detail="Not enough data after applying filters.")
+            engine.train((X, y), model_type=request.model)
+            processor.df = df_with_indicators
         
         # Predict
         if train_cutoff:
