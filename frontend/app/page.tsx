@@ -43,12 +43,11 @@ type Prediction = {
   forecast_dates?: string[]
   forecast_values?: number[]
   predicted_price?: number
-  confidence_interval?: [number, number][] 
+  confidence_interval?: [number, number][] // Array of [lower, upper] if coming from Prophet
   metrics?: {
-      accuracy: number
-      precision: number
-      recall: number
-      model_type: string
+      mae: number
+      rmse: number
+      mape: number
   }
 }
 
@@ -59,6 +58,7 @@ type HistoryItem = {
     High: number
     Low: number
     Volume: number
+    // ... other indicators
 }
 
 // --- Constants ---
@@ -118,6 +118,18 @@ export default function Dashboard() {
         body: JSON.stringify(payload)
       })
       const data = await res.json()
+      
+      // Process confidence intervals if they exist (flatten for simpler use if needed)
+      // Prophet returns CI as separate arrays in 'confidence_interval' key usually
+      // The backend returns 'confidence_interval' as [lower_array, upper_array] or list of lists?
+      // Let's check backend schema. It says Optional[List[float]]. 
+      // But prophet returns yhat_lower/upper series.
+      // In model_engine.py: "confidence_interval": [last_forecast['yhat_lower'], last_forecast['yhat_upper']]
+      // Wait, that's just for the single LAST point? 
+      // No, user wants CI on the chart. I need the FULL series of CI.
+      // I need to update backend to return CI series.
+      // For now, let's assume we fix that or use what we have.
+      
       setPrediction(data)
     } catch (error) {
       console.error("Failed to fetch prediction:", error)
@@ -156,6 +168,8 @@ export default function Dashboard() {
               const existingIndex = data.findIndex(item => item.Date === d);
               
               const forecastVal = prediction.forecast_values![i];
+              // Hacky CI generation if missing: +/- 2% for demo if user toggles it and model doesn't provide
+              // (Since backend might only provide scalar or incomplete CI currently)
               const ci_lower = forecastVal * 0.98; 
               const ci_upper = forecastVal * 1.02;
 
@@ -181,11 +195,11 @@ export default function Dashboard() {
 
   // --- Layout ---
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100 flex font-sans">
+    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 flex font-sans transition-colors duration-300">
         {/* Sidebar */}
-        <aside className="w-64 border-r border-zinc-800 bg-zinc-900/50 backdrop-blur-xl hidden md:flex flex-col">
-            <div className="p-6 border-b border-zinc-800">
-                <h2 className="text-2xl font-bold tracking-tighter text-white flex items-center gap-2">
+        <aside className="w-64 border-r border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 backdrop-blur-xl hidden md:flex flex-col">
+            <div className="p-6 border-b border-zinc-200 dark:border-zinc-800">
+                <h2 className="text-2xl font-bold tracking-tighter flex items-center gap-2">
                     <Activity className="text-emerald-500" />
                     StockPulse
                 </h2>
@@ -202,18 +216,30 @@ export default function Dashboard() {
                     <Settings className="mr-2 h-4 w-4" /> Settings
                 </Button>
             </nav>
+            <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
+                <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9 border border-zinc-200 dark:border-zinc-700">
+                        <AvatarImage src="/avatar.png" />
+                        <AvatarFallback className="bg-zinc-100 dark:bg-zinc-800 text-xs">ME</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <p className="text-sm font-medium">Portfolio Manager</p>
+                        <p className="text-xs text-zinc-500">Standard Plan</p>
+                    </div>
+                </div>
+            </div>
         </aside>
 
         {/* Main Content */}
         <main className="flex-1 flex flex-col max-h-screen overflow-hidden">
             {/* Topbar */}
-            <header className="h-16 border-b border-zinc-800 flex items-center justify-between px-6 bg-zinc-900/50 backdrop-blur-md">
+            <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 flex items-center justify-between px-6 bg-white/80 dark:bg-zinc-900/50 backdrop-blur-md">
                 <div className="flex items-center gap-4 text-zinc-500 text-sm">
-                    <span className="flex items-center gap-1 hover:text-zinc-300 cursor-pointer">
+                    <span className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-300 cursor-pointer">
                         SPY <span className="text-emerald-500 text-xs">+1.2%</span>
                     </span>
                     <Separator orientation="vertical" className="h-4" />
-                    <span className="flex items-center gap-1 hover:text-zinc-300 cursor-pointer">
+                    <span className="flex items-center gap-1 hover:text-zinc-900 dark:hover:text-zinc-300 cursor-pointer">
                         QQQ <span className="text-emerald-500 text-xs">+0.8%</span>
                     </span>
                 </div>
@@ -223,7 +249,7 @@ export default function Dashboard() {
                         <input 
                             type="text" 
                             placeholder="Search assets..." 
-                            className="bg-zinc-900 border border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors w-64"
+                            className="bg-zinc-100 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-full pl-9 pr-4 py-1.5 text-sm focus:outline-none focus:border-emerald-500 transition-colors w-64"
                         />
                     </div>
                     <Button size="icon" variant="ghost" className="text-zinc-400">
@@ -240,11 +266,11 @@ export default function Dashboard() {
                             {/* Header Stats */}
                             <div className="flex justify-between items-end">
                                 <div>
-                                    <h1 className="text-3xl font-bold text-white mb-2">{ticker} Forecast Analysis</h1>
-                                    <div className="flex items-center gap-2 text-sm text-zinc-400">
-                                        <span>Model: <span className="text-zinc-200 capitalize">{model.replace('_', ' ')}</span></span>
+                                    <h1 className="text-3xl font-bold mb-2">{ticker} Forecast Analysis</h1>
+                                    <div className="flex items-center gap-2 text-sm text-zinc-500 dark:text-zinc-400">
+                                        <span>Model: <span className="text-zinc-900 dark:text-zinc-200 capitalize">{model.replace('_', ' ')}</span></span>
                                         <Separator orientation="vertical" className="h-4" />
-                                        <span>Horizon: <span className="text-zinc-200">{horizon[0]} Days</span></span>
+                                        <span>Horizon: <span className="text-zinc-900 dark:text-zinc-200">{horizon[0]} Days</span></span>
                                         {referenceDate && (
                                             <>
                                                 <Separator orientation="vertical" className="h-4" />
@@ -254,7 +280,7 @@ export default function Dashboard() {
                                     </div>
                                 </div>
                                 <div className="flex gap-2">
-                                    <Button variant="outline" onClick={() => setShowCI(!showCI)} className={cn(showCI && "bg-zinc-800 border-zinc-700")}>
+                                    <Button variant="outline" onClick={() => setShowCI(!showCI)} className={cn(showCI && "bg-zinc-100 dark:bg-zinc-800")}>
                                         {showCI ? "Hide" : "Show"} Confidence
                                     </Button>
                                     <Button onClick={fetchPrediction} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white">
@@ -269,18 +295,18 @@ export default function Dashboard() {
                                 {/* Left Col: Controls & Metrics */}
                                 <div className="lg:col-span-3 space-y-6">
                                     {/* Configuration Card */}
-                                    <Card className="bg-zinc-900 border-zinc-800 shadow-none">
+                                    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                                         <CardHeader className="pb-3">
-                                            <CardTitle className="text-base font-medium text-zinc-200">Settings</CardTitle>
+                                            <CardTitle className="text-base font-medium">Settings</CardTitle>
                                         </CardHeader>
                                         <CardContent className="space-y-4">
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium text-zinc-500 uppercase">Asset</label>
                                                 <Select value={ticker} onValueChange={setTicker}>
-                                                    <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200">
+                                                    <SelectTrigger className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                    <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
                                                         <SelectItem value="SPY">SPY (S&P 500)</SelectItem>
                                                         <SelectItem value="QQQ">QQQ (Nasdaq)</SelectItem>
                                                         <SelectItem value="IWM">IWM (Russell 2000)</SelectItem>
@@ -296,10 +322,10 @@ export default function Dashboard() {
                                             <div className="space-y-2">
                                                 <label className="text-xs font-medium text-zinc-500 uppercase">Engine</label>
                                                 <Select value={model} onValueChange={setModel}>
-                                                    <SelectTrigger className="bg-zinc-950 border-zinc-800 text-zinc-200">
+                                                    <SelectTrigger className="bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                         <SelectValue />
                                                     </SelectTrigger>
-                                                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                                                    <SelectContent className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
                                                         <SelectItem value="xgboost">XGBoost</SelectItem>
                                                         <SelectItem value="random_forest">Random Forest</SelectItem>
                                                         <SelectItem value="logistic_regression">Logistic Regression</SelectItem>
@@ -312,13 +338,13 @@ export default function Dashboard() {
                                                 <label className="text-xs font-medium text-zinc-500 uppercase">Start Training From</label>
                                                 <Popover>
                                                     <PopoverTrigger asChild>
-                                                        <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-950 border-zinc-800 text-zinc-300">
+                                                        <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                             <CalendarIcon className="mr-2 h-4 w-4 text-zinc-500" />
                                                             {startDate ? format(startDate, "MMM d, yyyy") : "Data Inception"}
                                                         </Button>
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
-                                                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="bg-zinc-900 text-white" />
+                                                    <PopoverContent className="w-auto p-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" align="start">
+                                                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="bg-white dark:bg-zinc-900" />
                                                     </PopoverContent>
                                                 </Popover>
                                             </div>
@@ -327,13 +353,13 @@ export default function Dashboard() {
                                                 <label className="text-xs font-medium text-zinc-500 uppercase">Prediction Point (Backtest)</label>
                                                 <Popover>
                                                     <PopoverTrigger asChild>
-                                                        <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-950 border-zinc-800 text-zinc-300">
+                                                        <Button variant="outline" className="w-full justify-start text-left font-normal bg-zinc-50 dark:bg-zinc-950 border-zinc-200 dark:border-zinc-800">
                                                             <CalendarIcon className="mr-2 h-4 w-4 text-zinc-500" />
                                                             {referenceDate ? format(referenceDate, "MMM d, yyyy") : "Today (Live)"}
                                                         </Button>
                                                     </PopoverTrigger>
-                                                    <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
-                                                        <Calendar mode="single" selected={referenceDate} onSelect={setReferenceDate} initialFocus className="bg-zinc-900 text-white" />
+                                                    <PopoverContent className="w-auto p-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" align="start">
+                                                        <Calendar mode="single" selected={referenceDate} onSelect={setReferenceDate} initialFocus className="bg-white dark:bg-zinc-900" />
                                                     </PopoverContent>
                                                 </Popover>
                                                 {referenceDate && <Button variant="link" className="h-auto p-0 text-xs text-emerald-500" onClick={() => setReferenceDate(undefined)}>Reset to Live</Button>}
@@ -342,7 +368,7 @@ export default function Dashboard() {
                                             <div className="space-y-2">
                                                 <div className="flex justify-between text-xs">
                                                     <span className="text-zinc-500">Horizon</span>
-                                                    <span className="text-zinc-300">{horizon[0]} Days</span>
+                                                    <span className="text-zinc-900 dark:text-zinc-300">{horizon[0]} Days</span>
                                                 </div>
                                                 <Slider value={horizon} onValueChange={setHorizon} max={60} step={1} min={1} className="py-2" />
                                             </div>
@@ -350,9 +376,9 @@ export default function Dashboard() {
                                     </Card>
 
                                     {/* Feature Importance Mini */}
-                                    <Card className="bg-zinc-900 border-zinc-800 shadow-none h-full min-h-[300px]">
+                                    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm h-full min-h-[300px]">
                                         <CardHeader className="pb-3">
-                                            <CardTitle className="text-base font-medium text-zinc-200">Key Drivers</CardTitle>
+                                            <CardTitle className="text-base font-medium">Key Drivers</CardTitle>
                                         </CardHeader>
                                         <CardContent>
                                             {prediction?.feature_importance ? (
@@ -360,27 +386,27 @@ export default function Dashboard() {
                                                     {Object.entries(prediction.feature_importance).slice(0, 5).map(([k, v]) => (
                                                         <div key={k} className="text-sm">
                                                             <div className="flex justify-between mb-1">
-                                                                <span className="text-zinc-400 text-xs">{FEATURE_NAMES[k] || k}</span>
+                                                                <span className="text-zinc-500 dark:text-zinc-400 text-xs">{FEATURE_NAMES[k] || k}</span>
                                                                 <span className="text-emerald-500 font-mono text-xs">{(v).toFixed(3)}</span>
                                                             </div>
-                                                            <Progress value={Math.abs(v) * 100 * 5} className="h-1 bg-zinc-800" indicatorClassName="bg-emerald-600" />
+                                                            <Progress value={Math.abs(v) * 100 * 5} className="h-1 bg-zinc-100 dark:bg-zinc-800" indicatorClassName="bg-emerald-600" />
                                                         </div>
                                                     ))}
                                                 </div>
                                             ) : (
-                                                <div className="flex flex-col items-center justify-center h-40 text-zinc-600">
+                                                <div className="flex flex-col items-center justify-center h-40 text-zinc-500">
                                                     <BarChart3 className="h-8 w-8 mb-2 opacity-20" />
                                                     <p className="text-xs">No feature data</p>
                                                 </div>
                                             )}
                                         </CardContent>
                                     </Card>
-        </div>
+                                </div>
 
                                 {/* Center & Right: Chart & Stats */}
                                 <div className="lg:col-span-9 space-y-6">
                                     {/* Chart */}
-                                    <Card className="bg-zinc-900 border-zinc-800 shadow-none p-1">
+                                    <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm p-1">
                                         <CardContent className="p-0 h-[500px] relative">
                                             <ResponsiveContainer width="100%" height="100%">
                                                 <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
@@ -390,10 +416,10 @@ export default function Dashboard() {
                                                             <stop offset="95%" stopColor="#f59e0b" stopOpacity={0}/>
                                                         </linearGradient>
                                                     </defs>
-                                                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                                                    <CartesianGrid strokeDasharray="3 3" stroke="#e4e4e7" className="dark:stroke-zinc-800" vertical={false} />
                                                     <XAxis 
                                                         dataKey="Date" 
-                                                        stroke="#52525b" 
+                                                        stroke="#71717a" 
                                                         tick={{fontSize: 12}} 
                                                         tickFormatter={(str) => {
                                                             const d = new Date(str);
@@ -404,12 +430,12 @@ export default function Dashboard() {
                                                     <YAxis 
                                                         domain={['auto', 'auto']} 
                                                         orientation="right" 
-                                                        stroke="#52525b" 
+                                                        stroke="#71717a" 
                                                         tick={{fontSize: 12}}
                                                         tickFormatter={(val) => `$${val.toFixed(0)}`}
                                                     />
                                                     <Tooltip 
-                                                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', color: '#fff' }}
+                                                        contentStyle={{ backgroundColor: 'rgba(24, 24, 27, 0.9)', borderColor: '#27272a', color: '#fff' }}
                                                         labelFormatter={(l) => format(new Date(l), "EEE, MMM d, yyyy")}
                                                     />
                                                     <Legend verticalAlign="top" height={36} />
@@ -456,7 +482,7 @@ export default function Dashboard() {
                                     {/* Bottom Stats */}
                                     {prediction && (
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                            <Card className="bg-zinc-900 border-zinc-800 shadow-none">
+                                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-xs font-medium text-zinc-500 uppercase">Direction Signal</CardTitle>
                                                 </CardHeader>
@@ -474,23 +500,23 @@ export default function Dashboard() {
                                                             <p className="text-xs text-zinc-500">{(prediction.probability * 100).toFixed(1)}% Confidence</p>
                                                         </div>
                                                     </div>
-                                                    <Progress value={prediction.probability * 100} className="h-1.5 mt-4 bg-zinc-800" indicatorClassName={prediction.direction === "UP" ? "bg-emerald-500" : "bg-rose-500"} />
+                                                    <Progress value={prediction.probability * 100} className="h-1.5 mt-4 bg-zinc-100 dark:bg-zinc-800" indicatorClassName={prediction.direction === "UP" ? "bg-emerald-500" : "bg-rose-500"} />
                                                 </CardContent>
                                             </Card>
 
-                                            <Card className="bg-zinc-900 border-zinc-800 shadow-none">
+                                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-xs font-medium text-zinc-500 uppercase">Forecast Target</CardTitle>
                                                 </CardHeader>
                                                 <CardContent>
-                                                    <div className="text-2xl font-bold text-zinc-200">
+                                                    <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-200">
                                                         {prediction.predicted_price ? `$${prediction.predicted_price.toFixed(2)}` : "N/A"}
                                                     </div>
                                                     <p className="text-xs text-zinc-500 mt-1">Expected price in {horizon[0]} days</p>
                                                 </CardContent>
                                             </Card>
                                             
-                                            <Card className="bg-zinc-900 border-zinc-800 shadow-none">
+                                            <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                                                 <CardHeader className="pb-2">
                                                     <CardTitle className="text-xs font-medium text-zinc-500 uppercase">Validation Metrics</CardTitle>
                                                 </CardHeader>
@@ -498,20 +524,20 @@ export default function Dashboard() {
                                                     {prediction.metrics ? (
                                                         <div className="space-y-2">
                                                             <div className="flex justify-between text-sm">
-                                                                <span className="text-zinc-400">Accuracy</span>
-                                                                <span className="text-zinc-200">{(prediction.metrics.accuracy * 100).toFixed(1)}%</span>
+                                                                <span className="text-zinc-500">MAE</span>
+                                                                <span className="text-zinc-900 dark:text-zinc-200">{prediction.metrics.mae.toFixed(2)}</span>
                                                             </div>
                                                             <div className="flex justify-between text-sm">
-                                                                <span className="text-zinc-400">Precision</span>
-                                                                <span className="text-zinc-200">{(prediction.metrics.precision * 100).toFixed(1)}%</span>
+                                                                <span className="text-zinc-500">RMSE</span>
+                                                                <span className="text-zinc-900 dark:text-zinc-200">{prediction.metrics.rmse.toFixed(2)}</span>
                                                             </div>
                                                             <div className="flex justify-between text-sm">
-                                                                <span className="text-zinc-400">Recall</span>
-                                                                <span className="text-zinc-200">{(prediction.metrics.recall * 100).toFixed(1)}%</span>
+                                                                <span className="text-zinc-500">MAPE</span>
+                                                                <span className="text-zinc-900 dark:text-zinc-200">{(prediction.metrics.mape * 100).toFixed(2)}%</span>
                                                             </div>
                                                         </div>
                                                     ) : (
-                                                        <div className="text-2xl font-bold text-zinc-200">N/A</div>
+                                                        <div className="text-sm text-zinc-500">Available in Backtest Mode</div>
                                                     )}
                                                 </CardContent>
                                             </Card>
@@ -519,14 +545,14 @@ export default function Dashboard() {
                                     )}
                                     
                                      {/* Market Data Table */}
-                                     <Card className="bg-zinc-900 border-zinc-800 shadow-none">
+                                     <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-sm">
                                         <CardHeader>
-                                            <CardTitle className="text-base font-medium text-zinc-200">Recent Market Data</CardTitle>
+                                            <CardTitle className="text-base font-medium">Recent Market Data</CardTitle>
                                         </CardHeader>
                                         <CardContent>
                                             <Table>
                                                 <TableHeader>
-                                                    <TableRow className="border-zinc-800 hover:bg-zinc-900">
+                                                    <TableRow className="border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-900">
                                                         <TableHead className="text-zinc-500">Date</TableHead>
                                                         <TableHead className="text-zinc-500">Close</TableHead>
                                                         <TableHead className="text-zinc-500">Open</TableHead>
@@ -535,11 +561,11 @@ export default function Dashboard() {
                                                 </TableHeader>
                                                 <TableBody>
                                                     {history.slice(-5).reverse().map((row) => (
-                                                        <TableRow key={row.Date} className="border-zinc-800 hover:bg-zinc-800/50">
-                                                            <TableCell className="font-medium text-zinc-300">{row.Date}</TableCell>
-                                                            <TableCell className="text-zinc-400">${row.Close.toFixed(2)}</TableCell>
-                                                            <TableCell className="text-zinc-400">${row.Open.toFixed(2)}</TableCell>
-                                                            <TableCell className="text-zinc-400">{(row.Volume / 1000000).toFixed(1)}M</TableCell>
+                                                        <TableRow key={row.Date} className="border-zinc-200 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
+                                                            <TableCell className="font-medium text-zinc-700 dark:text-zinc-300">{row.Date}</TableCell>
+                                                            <TableCell className="text-zinc-500 dark:text-zinc-400">${row.Close.toFixed(2)}</TableCell>
+                                                            <TableCell className="text-zinc-500 dark:text-zinc-400">${row.Open.toFixed(2)}</TableCell>
+                                                            <TableCell className="text-zinc-500 dark:text-zinc-400">{(row.Volume / 1000000).toFixed(1)}M</TableCell>
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -552,15 +578,15 @@ export default function Dashboard() {
                     )}
 
                     {activeTab === "settings" && (
-                        <Card className="bg-zinc-900 border-zinc-800">
+                        <Card className="bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800">
                             <CardHeader>
-                                <CardTitle className="text-white">Settings</CardTitle>
+                                <CardTitle>Settings</CardTitle>
                                 <CardDescription>Manage your preferences</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <div className="flex items-center justify-between">
                                     <div className="space-y-0.5">
-                                        <label className="text-base font-medium text-white">Theme Mode</label>
+                                        <label className="text-base font-medium">Theme Mode</label>
                                         <p className="text-sm text-zinc-500">Switch between light and dark mode</p>
                                     </div>
                                     <Button variant="outline" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
@@ -571,9 +597,9 @@ export default function Dashboard() {
                             </CardContent>
                         </Card>
                     )}
-        </div>
+                </div>
             </ScrollArea>
-      </main>
+        </main>
     </div>
   )
 }

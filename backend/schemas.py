@@ -6,6 +6,12 @@ class PredictionRequest(BaseModel):
     model: str = "xgboost"
     horizon: int = 14
     reference_date: Optional[str] = None # YYYY-MM-DD format
+    start_date: Optional[str] = None # YYYY-MM-DD format
+
+class Metrics(BaseModel):
+    mae: float
+    rmse: float
+    mape: float
 
 class PredictionResponse(BaseModel):
     ticker: str
@@ -17,6 +23,7 @@ class PredictionResponse(BaseModel):
     forecast_dates: Optional[List[str]] = None
     forecast_values: Optional[List[float]] = None
     confidence_interval: Optional[List[float]] = None
+    metrics: Optional[Metrics] = None
 
 class BacktestRequest(BaseModel):
     ticker: str = "SPY"
