@@ -152,6 +152,24 @@ export default function Dashboard() {
     fetchHistory()
   }, [ticker])
 
+  const minDate = useMemo(() => history.length ? new Date(history[0].Date) : undefined, [history])
+  const maxDate = useMemo(() => history.length ? new Date(history[history.length - 1].Date) : undefined, [history])
+
+  useEffect(() => {
+    if (startDate && minDate && startDate < minDate) {
+        setStartDate(minDate)
+    }
+    if (referenceDate && minDate && referenceDate < minDate) {
+        setReferenceDate(minDate)
+    }
+  }, [minDate])
+
+  useEffect(() => {
+    if (referenceDate && startDate && referenceDate < startDate) {
+        setReferenceDate(startDate)
+    }
+  }, [startDate, referenceDate])
+
   // --- Chart Data Prep ---
   const chartData = useMemo(() => {
       const data = history.map(h => ({
@@ -170,8 +188,8 @@ export default function Dashboard() {
               const forecastVal = prediction.forecast_values![i];
               // Hacky CI generation if missing: +/- 2% for demo if user toggles it and model doesn't provide
               // (Since backend might only provide scalar or incomplete CI currently)
-              const ci_lower = forecastVal * 0.98; 
-              const ci_upper = forecastVal * 1.02;
+                const ci_lower = forecastVal * 0.98; 
+                const ci_upper = forecastVal * 1.02;
 
               if (existingIndex !== -1) {
                   data[existingIndex].Forecast = forecastVal;
@@ -192,6 +210,10 @@ export default function Dashboard() {
       }
       return data.sort((a, b) => new Date(a.Date).getTime() - new Date(b.Date).getTime());
   }, [history, prediction]);
+
+  const todayLabel = maxDate ? format(maxDate, "MMM d, yyyy") : null
+  const canShowForecast = Boolean(prediction?.forecast_values && prediction.forecast_values.length > 0)
+  const displayForecastTarget = prediction?.predicted_price ?? prediction?.forecast_values?.[prediction.forecast_values.length - 1] ?? null
 
   // --- Layout ---
   return (
@@ -279,10 +301,15 @@ export default function Dashboard() {
                                         )}
                                     </div>
                                 </div>
-                                <div className="flex gap-2">
-                                    <Button variant="outline" onClick={() => setShowCI(!showCI)} className={cn(showCI && "bg-zinc-100 dark:bg-zinc-800")}>
-                                        {showCI ? "Hide" : "Show"} Confidence
-                                    </Button>
+                        <div className="flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setShowCI(!showCI)} 
+                                disabled={!canShowForecast}
+                                className={cn(showCI && "bg-zinc-100 dark:bg-zinc-800")}
+                            >
+                                {showCI ? "Hide" : "Show"} Confidence
+                            </Button>
                                     <Button onClick={fetchPrediction} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white">
                                         {loading ? <Activity className="mr-2 h-4 w-4 animate-spin" /> : <Zap className="mr-2 h-4 w-4" />}
                                         Run Forecast
@@ -344,9 +371,20 @@ export default function Dashboard() {
                                                         </Button>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-auto p-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" align="start">
-                                                        <Calendar mode="single" selected={startDate} onSelect={setStartDate} initialFocus className="bg-white dark:bg-zinc-900" />
+                                                        <Calendar 
+                                                            mode="single" 
+                                                            selected={startDate} 
+                                                            onSelect={setStartDate} 
+                                                            fromDate={minDate}
+                                                            toDate={referenceDate ?? maxDate}
+                                                            initialFocus 
+                                                            className="bg-white dark:bg-zinc-900" 
+                                                        />
                                                     </PopoverContent>
                                                 </Popover>
+                                                {minDate && (
+                                                    <p className="text-[11px] text-zinc-500">Earliest data: {format(minDate, "MMM d, yyyy")}</p>
+                                                )}
                                             </div>
 
                                             <div className="space-y-2">
@@ -359,7 +397,15 @@ export default function Dashboard() {
                                                         </Button>
                                                     </PopoverTrigger>
                                                     <PopoverContent className="w-auto p-0 bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800" align="start">
-                                                        <Calendar mode="single" selected={referenceDate} onSelect={setReferenceDate} initialFocus className="bg-white dark:bg-zinc-900" />
+                                                        <Calendar 
+                                                            mode="single" 
+                                                            selected={referenceDate} 
+                                                            onSelect={setReferenceDate} 
+                                                            fromDate={startDate ?? minDate}
+                                                            toDate={maxDate}
+                                                            initialFocus 
+                                                            className="bg-white dark:bg-zinc-900" 
+                                                        />
                                                     </PopoverContent>
                                                 </Popover>
                                                 {referenceDate && <Button variant="link" className="h-auto p-0 text-xs text-emerald-500" onClick={() => setReferenceDate(undefined)}>Reset to Live</Button>}
@@ -401,7 +447,7 @@ export default function Dashboard() {
                                             )}
                                         </CardContent>
                                     </Card>
-                                </div>
+        </div>
 
                                 {/* Center & Right: Chart & Stats */}
                                 <div className="lg:col-span-9 space-y-6">
@@ -447,6 +493,7 @@ export default function Dashboard() {
                                                         stroke="#3b82f6" 
                                                         strokeWidth={2} 
                                                         dot={false} 
+                                                        connectNulls
                                                     />
                                                     
                                                     <Line 
@@ -470,6 +517,9 @@ export default function Dashboard() {
                                                                 fillOpacity={0.1} 
                                                             />
                                                         </>
+                                                    )}
+                                                    {maxDate && (
+                                                        <ReferenceLine x={history[history.length - 1]?.Date} stroke="#a1a1aa" strokeDasharray="2 2" label={{ value: "Today", position: "insideTopRight", fill: "#a1a1aa", fontSize: 10 }} />
                                                     )}
                                                     {prediction?.forecast_dates && (
                                                         <ReferenceLine x={prediction.forecast_dates[0]} stroke="#71717a" strokeDasharray="3 3" label={{ value: "Forecast Start", position: "insideTopLeft", fill: "#71717a", fontSize: 10 }} />
@@ -510,7 +560,7 @@ export default function Dashboard() {
                                                 </CardHeader>
                                                 <CardContent>
                                                     <div className="text-2xl font-bold text-zinc-900 dark:text-zinc-200">
-                                                        {prediction.predicted_price ? `$${prediction.predicted_price.toFixed(2)}` : "N/A"}
+                                                        {displayForecastTarget ? `$${displayForecastTarget.toFixed(2)}` : "N/A"}
                                                     </div>
                                                     <p className="text-xs text-zinc-500 mt-1">Expected price in {horizon[0]} days</p>
                                                 </CardContent>
@@ -597,9 +647,9 @@ export default function Dashboard() {
                             </CardContent>
                         </Card>
                     )}
-                </div>
+        </div>
             </ScrollArea>
-        </main>
+      </main>
     </div>
   )
 }

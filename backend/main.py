@@ -31,10 +31,18 @@ def predict(request: PredictionRequest):
         processor.fetch_data() 
         df_with_indicators = processor.add_indicators()
         
-        # Filter by Start Date if provided
+        earliest_date = df_with_indicators.index.min()
+        
         if request.start_date:
             start_dt = pd.to_datetime(request.start_date)
+            if start_dt < earliest_date:
+                start_dt = earliest_date
             df_with_indicators = df_with_indicators[df_with_indicators.index >= start_dt]
+        else:
+            start_dt = earliest_date
+        
+        if df_with_indicators.empty:
+            raise HTTPException(status_code=400, detail="Not enough historical data for the selected range.")
 
         # Handle Backtesting/Reference Date
         train_cutoff = None
@@ -42,6 +50,8 @@ def predict(request: PredictionRequest):
         
         if request.reference_date:
             ref_dt = pd.to_datetime(request.reference_date)
+            if ref_dt < start_dt:
+                ref_dt = start_dt
             if ref_dt > df_with_indicators.index[-1]:
                  pass
             else:

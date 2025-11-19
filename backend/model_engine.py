@@ -114,23 +114,44 @@ class ModelEngine:
             }
             
         else:
-            # Classification
+            # Classification models - convert probability into a smooth synthetic price path
             if self.features is None:
                 raise ValueError("Features not defined.")
                 
             X = df_latest[self.features]
-            # We usually predict only the last row (most recent)
             X_last = X.iloc[[-1]]
             
-            prob = self.model.predict_proba(X_last)[0][1] # Prob of class 1 (UP)
+            prob = self.model.predict_proba(X_last)[0][1]  # Prob of class 1 (UP)
             direction = "UP" if prob > 0.5 else "DOWN"
+            
+            current_price = float(df_latest['Close'].iloc[-1])
+            horizon = max(horizon_days, 1)
+            # Expected move scaled by probability confidence (max +/-8% across 30 days)
+            base_move = (prob - 0.5) * 0.16  # +/-8%
+            horizon_scale = min(horizon / 30.0, 2)
+            target_price = current_price * (1 + base_move * horizon_scale)
+            
+            forecast_dates = []
+            forecast_values = []
+            for i in range(1, horizon + 1):
+                date = df_latest.index[-1] + pd.Timedelta(days=i)
+                forecast_dates.append(date.strftime('%Y-%m-%d'))
+                ratio = i / horizon
+                interpolated = current_price + (target_price - current_price) * ratio
+                forecast_values.append(float(interpolated))
+            
+            predicted_price = forecast_values[-1]
+            band = 0.02 + (0.5 - abs(prob - 0.5)) * 0.04
+            confidence_interval = [
+                predicted_price * (1 - band),
+                predicted_price * (1 + band)
+            ]
             
             # Feature Importance
             importance = {}
             if hasattr(self.model, 'feature_importances_'):
                 imps = self.model.feature_importances_
                 importance = dict(zip(self.features, [float(x) for x in imps]))
-                # Sort top 5
                 importance = dict(sorted(importance.items(), key=lambda item: item[1], reverse=True)[:5])
             elif hasattr(self.model, 'coef_'):
                 imps = self.model.coef_[0]
@@ -139,6 +160,10 @@ class ModelEngine:
             return {
                 "direction": direction,
                 "probability": float(prob),
-                "feature_importance": importance
+                "feature_importance": importance,
+                "predicted_price": predicted_price,
+                "forecast_dates": forecast_dates,
+                "forecast_values": forecast_values,
+                "confidence_interval": confidence_interval
             }
 
