@@ -5,6 +5,7 @@ class PredictionRequest(BaseModel):
     ticker: str = "SPY"
     model: str = "xgboost"
     horizon: int = 14
+    reference_date: Optional[str] = None # YYYY-MM-DD format
 
 class PredictionResponse(BaseModel):
     ticker: str
@@ -26,4 +27,3 @@ class BacktestRequest(BaseModel):
 class HistoryRequest(BaseModel):
     ticker: str = "SPY"
     period: str = "2y"
-
