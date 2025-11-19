@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+pandas
+pandas-ta
+yfinance
+scikit-learn
+xgboost
+prophet
+httpx
+joblib
+pytest
