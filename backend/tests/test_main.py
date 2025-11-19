@@ -48,6 +48,8 @@ def test_predict_endpoint(MockModelEngine, MockDataProcessor):
     }
     
     response = client.post("/api/predict", json=payload)
+    if response.status_code != 200:
+        print(response.json())
     assert response.status_code == 200
     data = response.json()
     assert data["ticker"] == "SPY"

@@ -25,39 +25,21 @@ def predict(request: PredictionRequest):
     try:
         # 1. Fetch Data
         processor = DataProcessor(request.ticker)
-        processor.fetch_data() # Default 2y
-        processor.add_indicators()
-        df = processor.prepare_target(request.horizon)
+        processor.fetch_data() 
+        df_with_indicators = processor.add_indicators()
         
         # 2. Train Model
         engine = ModelEngine()
-        # Train on all data except last horizon (where target is unknown?)
-        # Actually, prepare_target drops rows where target is NaN (the last horizon_days).
-        # So df contains only data with known targets.
-        # We train on this.
         
-        # But we need to predict for the LATEST data point (today).
-        # 'df' from prepare_target has removed the last 'horizon' rows.
-        # So we need the original full dataframe for prediction input.
-        
-        # Let's get the full dataframe with indicators
-        processor.fetch_data() # Re-fetch or we should have stored it?
-        # DataProcessor stores self.df. 
-        # But prepare_target modifies self.df to drop NaNs.
-        # We should have a method to get training data and prediction data.
-        
-        # Re-instantiate or better usage of DataProcessor needed.
-        # Let's optimize:
-        
-        processor = DataProcessor(request.ticker)
-        raw_df = processor.fetch_data()
-        df_with_indicators = processor.add_indicators()
-        
-        # Create training set (drop NaNs from indicators)
-        train_df = processor.prepare_target(request.horizon) # This drops last 14 rows
-        
-        # Train
-        engine.train(train_df, model_type=request.model)
+        if request.model == "prophet":
+            # Prophet needs the full time series history, not truncated labeled data
+            # We train on the entire available history to predict the FUTURE
+            engine.train(df_with_indicators, model_type=request.model)
+        else:
+            # Supervised models need labeled data (target known)
+            # prepare_target drops the last 'horizon' rows where target is NaN
+            train_df = processor.prepare_target(request.horizon)
+            engine.train(train_df, model_type=request.model)
         
         # Predict on latest data
         # We need the row corresponding to "Today" (or most recent close).
