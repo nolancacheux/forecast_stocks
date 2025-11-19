@@ -1,0 +1,40 @@
+name: Daily Market Prediction
+
+on:
+  schedule:
+    - cron: '0 21 * * 1-5' # At 21:00 UTC on every day-of-week from Monday through Friday.
+  workflow_dispatch: # Allow manual trigger
+
+permissions:
+  contents: write
+
+jobs:
+  update-predictions:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v4
+      
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+        
+    - name: Install dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: Run Daily Update
+      run: |
+        cd backend
+        python daily_task.py
+        
+    - name: Commit and Push changes
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: "Auto: Update predictions for ${{ github.event.repository.updated_at }}"
+        file_pattern: 'frontend/public/data/*.json'
+
