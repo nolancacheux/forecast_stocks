@@ -1,52 +1,80 @@
-# MarketFocus AI
+# StockPulse
 
-High-performance financial prediction dashboard using Next.js, Python FastAPI, and XGBoost.
+**Institutional-Grade AI Financial Forecasting Engine**
 
-## Features
+StockPulse is a high-performance, full-stack predictive analytics dashboard for financial markets. It leverages advanced machine learning models (XGBoost, Random Forest, Linear Regression, Prophet) to forecast asset prices with multi-horizon regression and rigorous backtesting capabilities.
 
-- **Prediction Engine**: XGBoost, Random Forest, Logistic Regression, Prophet.
-- **Technical Analysis**: EMA, MACD, RSI, Bollinger Bands, etc.
-- **Dashboard**: Interactive UI with Recharts and Shadcn/UI.
-- **Automation**: Daily updates via GitHub Actions.
+![StockPulse Dashboard](https://placehold.co/1200x600/18181b/emerald/png?text=StockPulse+Dashboard+Preview)
 
-## Structure
+## 🚀 Features
 
-- `frontend/`: Next.js 14 App Router.
-- `backend/`: FastAPI, Machine Learning pipeline.
-- `.github/workflows/`: Automation scripts.
+-   **Multi-Model AI Engine**: Switch dynamically between **XGBoost**, **Random Forest**, **Linear Regression**, and **Prophet**.
+-   **True Multi-Horizon Forecasting**: Uses `MultiOutputRegressor` for non-time-series models to generate smooth, accurate price paths (not just linear interpolation).
+-   **Time-Travel Backtesting**: precise evaluation with **MAE**, **RMSE**, and **MAPE** metrics by training only on data available up to a specific past date.
+-   **Interactive Visualization**: Professional-grade charts with **Recharts**, featuring confidence intervals, "Today" markers, and historical/forecast overlays.
+-   **Technical Analysis**: Automated calculation of RSI, MACD, Bollinger Bands, Ichimoku Cloud, and Candle Patterns.
+-   **Modern UI/UX**: Built with **Next.js 14**, **Shadcn/UI**, and **Tailwind CSS** in a sleek Dark/Light mode interface.
 
-## Local Development
+## 🛠 Tech Stack
 
-### Frontend
+-   **Frontend**: Next.js 14 (App Router), TypeScript, Tailwind CSS, Shadcn/UI, Recharts, Lucide Icons.
+-   **Backend**: Python 3.10+, FastAPI, Pandas, Scikit-learn, XGBoost, Prophet, YFinance.
+-   **DevOps**: Docker, GitHub Actions (Daily Automation).
+
+## ⚡ Quick Start
+
+### Prerequisites
+-   Node.js 18+
+-   Python 3.10+
+
+### Installation
+
+1.  **Clone the repository**
+    ```bash
+    git clone https://github.com/nolancacheux/forecast_stocks.git
+    cd forecast_stocks
+    ```
+
+2.  **Backend Setup**
+    ```bash
+    cd backend
+    python -m venv .venv
+    # Windows
+    .venv\Scripts\activate
+    # Mac/Linux
+    # source .venv/bin/activate
+    
+    pip install -r requirements.txt
+    uvicorn main:app --reload
+    ```
+
+3.  **Frontend Setup**
+    ```bash
+    cd frontend
+    npm install
+    npm run dev
+    ```
+
+4.  **Access**
+    -   Frontend: `http://localhost:3000`
+    -   API Docs: `http://localhost:8000/docs`
+
+## 🔧 GitHub CLI Description
+
+To update your repository description using GitHub CLI to match this project's scope:
+
 ```bash
-cd frontend
-npm install
-npm run dev
+gh repo edit --description "StockPulse: Institutional-grade financial forecasting engine with AI backtesting, multi-horizon regression (XGBoost/Prophet), and interactive Next.js dashboard." --homepage "http://localhost:3000"
 ```
-Access at `http://localhost:3000`.
 
-### Backend
+## 🧪 Testing
+
+Run the backend test suite:
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn main:app --reload
+pytest
 ```
-Access API at `http://localhost:8000`.
 
-## Deployment
+## 📄 License
 
-### Frontend (Vercel)
-1. Push code to GitHub.
-2. Import `frontend` directory in Vercel.
-3. Deploy.
-
-### Backend (Render/Railway)
-1. Create a Web Service.
-2. Point to `backend` directory (or root and set Root Directory to `backend`).
-3. Build Command: `pip install -r requirements.txt`.
-4. Start Command: `uvicorn main:app --host 0.0.0.0 --port 10000` (or `$PORT`).
-
-### Automation
-The GitHub Action `.github/workflows/daily_update.yml` runs daily at 21:00 UTC to retrain models and save predictions to `frontend/public/data/predictions.json`.
+MIT
