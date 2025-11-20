@@ -6,7 +6,6 @@ StockPulse is a full-stack predictive analytics dashboard for financial markets.
 
 ![Dashboard](frontend/images/dashboard.png)
 
-![Information](frontend/images/infos.png)
 
 ## Features
 
@@ -16,6 +15,8 @@ StockPulse is a full-stack predictive analytics dashboard for financial markets.
 -   **Interactive Visualization**: Charts with **Recharts**, featuring confidence intervals, "Today" markers, and historical/forecast overlays.
 -   **Technical Analysis**: Automated calculation of RSI, MACD, Bollinger Bands, Ichimoku Cloud, and Candle Patterns.
 -   **Modern UI/UX**: Built with **Next.js 14**, **Shadcn/UI**, and **Tailwind CSS** in a sleek Dark/Light mode interface.
+
+![Information](frontend/images/infos.png)
 
 ## Tech Stack
 
