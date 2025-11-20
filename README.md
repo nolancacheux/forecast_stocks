@@ -4,9 +4,9 @@
 
 StockPulse is a full-stack predictive analytics dashboard for financial markets. It leverages advanced machine learning models (XGBoost, Random Forest, Linear Regression, Prophet) to forecast asset prices with multi-horizon regression and rigorous backtesting capabilities.
 
-![Dashboard](images/dashboard.png)
+![Dashboard](frontend/images/dashboard.png)
 
-![Information](images/information.png)
+![Information](frontend/images/information.png)
 
 ## Features
 
