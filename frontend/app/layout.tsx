@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "StockPulse AI",
-  description: "Professional Financial Forecasting",
+  description: "Financial Forecasting by Nolan Cacheux",
 };
 
 export default function RootLayout({

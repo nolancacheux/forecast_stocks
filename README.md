@@ -6,7 +6,7 @@ StockPulse is a full-stack predictive analytics dashboard for financial markets.
 
 ![Dashboard](frontend/images/dashboard.png)
 
-![Information](frontend/images/information.png)
+![Information](frontend/images/infos.png)
 
 ## Features
 

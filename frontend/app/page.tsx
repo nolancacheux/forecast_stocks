@@ -233,7 +233,7 @@ export default function Dashboard() {
                     <Activity className="text-emerald-500" />
                     StockPulse
                 </h2>
-                <p className="text-xs text-zinc-500 mt-1">Professional Forecast Engine</p>
+                <p className="text-xs text-zinc-500 mt-1">Financial Forecasting by Nolan Cacheux</p>
             </div>
             <nav className="flex-1 p-4 space-y-2">
                 <Button variant={activeTab === "dashboard" ? "secondary" : "ghost"} className="w-full justify-start" onClick={() => setActiveTab("dashboard")}>
