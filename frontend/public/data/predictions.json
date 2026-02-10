@@ -1,0 +1,14 @@
+{
+  "SPY": {
+    "error": "too many values to unpack (expected 2)"
+  },
+  "QQQ": {
+    "error": "too many values to unpack (expected 2)"
+  },
+  "IWM": {
+    "error": "too many values to unpack (expected 2)"
+  },
+  "DIA": {
+    "error": "too many values to unpack (expected 2)"
+  }
+}
